@@ -1,0 +1,1550 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>مسار | لوحة الإدارة والعمليات المركزية (Masar Operations Hub)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <!-- مكتبة Supabase JS الرسمية للربط الحي وتقنيات Realtime -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body {
+      font-family: 'Cairo', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.04);
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: rgba(0, 0, 0, 0.18);
+      border-radius: 999px;
+    }
+    @keyframes pulse-dot {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.35); opacity: 0.6; }
+    }
+    .live-dot {
+      animation: pulse-dot 1.8s infinite ease-in-out;
+    }
+    @keyframes highlight-row {
+      0% { background-color: rgba(16, 185, 129, 0.25); }
+      100% { background-color: transparent; }
+    }
+    .new-row-flash {
+      animation: highlight-row 3s ease-out;
+    }
+  </style>
+</head>
+<body class="bg-[#F8FAFC] text-slate-800 antialiased min-h-screen flex flex-col selection:bg-emerald-500 selection:text-white transition-colors duration-200" id="mainBody">
+
+  <!-- ========================================================================= -->
+  <!-- 1. الشريط العلوي الرئيسي (Enterprise Navigation Bar) -->
+  <!-- ========================================================================= -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between">
+      
+      <!-- شعار واسم المنصة -->
+      <div class="flex items-center gap-3">
+        <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-[#002360] to-[#006C49] flex items-center justify-center text-white font-extrabold text-2xl shadow-md shadow-blue-900/15">
+          مـ
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-xl font-black text-[#002360] tracking-tight">مَسار (Masar)</h1>
+            <span class="bg-emerald-50 text-emerald-800 text-xs font-bold px-2.5 py-0.5 rounded-full border border-emerald-200/80">
+              لوحة العمليات والتحكم المركزي
+            </span>
+          </div>
+          <p class="text-xs text-slate-500 font-medium">نظام إدارة التوصيل التشاركي الذكي • مدينة المكلا، حضرموت</p>
+        </div>
+      </div>
+
+      <!-- إشارات الحالة الحية وأزرار العمليات -->
+      <div class="flex items-center gap-2.5 sm:gap-3.5">
+        
+        <!-- مؤشر Supabase Realtime المتدفق -->
+        <div id="realtimeBadge" class="hidden md:flex items-center gap-2 px-3.5 py-1.5 bg-emerald-50 border border-emerald-200 rounded-full text-xs font-semibold text-emerald-800">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 live-dot"></span>
+          <span>بث Realtime لحظي متصل</span>
+          <span class="text-emerald-500 font-mono text-[11px]" id="latencyBadge">32ms</span>
+        </div>
+
+        <!-- زر إنشاء طلب تجريبي فوري -->
+        <button onclick="insertLiveTestOrder()" id="btnTestOrder" class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#006C49] hover:bg-[#005238] text-white rounded-xl text-xs font-bold shadow-sm transition-all active:scale-95 cursor-pointer">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+          </svg>
+          <span class="hidden sm:inline">+ طلب تجريبي جديد</span>
+          <span class="sm:hidden">+ طلب</span>
+        </button>
+
+        <!-- زر التحديث الفوري -->
+        <button onclick="fetchAllData()" id="btnRefresh" title="تحديث يدوي لكافة البيانات" class="p-2 text-slate-600 hover:text-[#002360] hover:bg-slate-100 rounded-xl transition-all cursor-pointer">
+          <svg id="refreshIcon" class="w-5 h-5 transition-transform duration-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+          </svg>
+        </button>
+
+        <!-- زر المظهر (داكن/فاتح) -->
+        <button onclick="toggleDarkMode()" class="p-2 text-slate-600 hover:text-amber-600 hover:bg-slate-100 rounded-xl transition-all cursor-pointer" title="تبديل المظهر">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
+          </svg>
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- ========================================================================= -->
+  <!-- 2. محتوى لوحة التحكم (Main Dashboard Container) -->
+  <!-- ========================================================================= -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full space-y-6">
+
+    <!-- شريط معلومات العمليات الميدانية -->
+    <div class="bg-gradient-to-r from-slate-900 to-[#002360] text-white rounded-2xl p-4 sm:p-5 shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div class="flex items-center gap-3.5">
+        <div class="p-3 bg-white/10 backdrop-blur-md rounded-xl text-emerald-400">
+          <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+          </svg>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h2 class="text-base sm:text-lg font-bold">المركز الرئيسي للتحكم والعمليات الميدانية — المكلا</h2>
+            <span class="bg-emerald-500/20 text-emerald-300 text-[11px] font-bold px-2 py-0.5 rounded-md border border-emerald-400/30">
+              بيئة التشغيل المباشرة
+            </span>
+          </div>
+          <p class="text-xs text-slate-300 mt-0.5">
+            الاستماع المباشر للتحديثات اللحظية عبر قنوات Supabase Realtime مفعّل لجميع الطلبات وتعيينات الكباتن
+          </p>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <div class="text-right">
+          <div class="text-[11px] text-slate-300">آخر مزامنة لقاعدة البيانات</div>
+          <div id="lastSyncTime" class="text-xs font-bold text-white font-mono">الآن</div>
+        </div>
+        <div class="px-3 py-1.5 bg-white/10 rounded-xl text-xs font-semibold text-emerald-300 flex items-center gap-1.5 border border-white/10">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 live-dot"></span>
+          <span>تزامن تلقائي</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- شبكة مؤشرات الأداء الحية (KPI Cards Grid) -->
+    <div class="grid grid-cols-2 lg:grid-cols-6 gap-3 sm:gap-4">
+      
+      <!-- 1. إجمالي المبيعات (GMV) -->
+      <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md transition-shadow">
+        <div class="flex items-center justify-between text-slate-500 text-xs font-semibold">
+          <span>إجمالي المبيعات (GMV)</span>
+          <div class="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+          </div>
+        </div>
+        <div class="mt-2 text-lg sm:text-xl font-black text-[#002360]" id="kpiGmv">-- ر.ي</div>
+        <div class="mt-1 text-[11px] text-emerald-600 font-semibold flex items-center gap-1">
+          <span>المكلا وضواحيها</span>
+        </div>
+      </div>
+
+      <!-- 2. أرباح وعمولات مسار (10%) -->
+      <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md transition-shadow">
+        <div class="flex items-center justify-between text-slate-500 text-xs font-semibold">
+          <span>أرباح مسار (10%)</span>
+          <div class="w-7 h-7 rounded-lg bg-blue-50 text-[#002360] flex items-center justify-center">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+          </div>
+        </div>
+        <div class="mt-2 text-lg sm:text-xl font-black text-emerald-700" id="kpiCommission">-- ر.ي</div>
+        <div class="mt-1 text-[11px] text-slate-500">عمولة المنصة الصافية</div>
+      </div>
+
+      <!-- 3. شحنات وطلبات اليوم -->
+      <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md transition-shadow">
+        <div class="flex items-center justify-between text-slate-500 text-xs font-semibold">
+          <span>شحنات اليوم</span>
+          <div class="w-7 h-7 rounded-lg bg-rose-50 text-[#E11D48] flex items-center justify-center">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
+          </div>
+        </div>
+        <div class="mt-2 text-lg sm:text-xl font-black text-slate-900" id="kpiTotalOrders">--</div>
+        <div class="mt-1 text-[11px] text-slate-500" id="kpiOrdersSub">-- جاري • -- مكتمل</div>
+      </div>
+
+      <!-- 4. الكباتن المتصلين أونلاين -->
+      <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md transition-shadow">
+        <div class="flex items-center justify-between text-slate-500 text-xs font-semibold">
+          <span>المناديب النشطين</span>
+          <div class="w-7 h-7 rounded-lg bg-teal-50 text-teal-600 flex items-center justify-center">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path></svg>
+          </div>
+        </div>
+        <div class="mt-2 text-lg sm:text-xl font-black text-teal-700" id="kpiCouriers">-- كابتن</div>
+        <div class="mt-1 text-[11px] text-emerald-600 font-semibold">تغطية الأحياء نشطة</div>
+      </div>
+
+      <!-- 5. المتاجر المعتمدة في المكلا -->
+      <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md transition-shadow">
+        <div class="flex items-center justify-between text-slate-500 text-xs font-semibold">
+          <span>المتاجر الشريكة</span>
+          <div class="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
+          </div>
+        </div>
+        <div class="mt-2 text-lg sm:text-xl font-black text-slate-900" id="kpiStores">-- متجر</div>
+        <div class="mt-1 text-[11px] text-slate-500" id="kpiProducts">-- صنف مسجل</div>
+      </div>
+
+      <!-- 6. المستخدمين المسجلين -->
+      <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md transition-shadow">
+        <div class="flex items-center justify-between text-slate-500 text-xs font-semibold">
+          <span>المستخدمين المسجلين</span>
+          <div class="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+          </div>
+        </div>
+        <div class="mt-2 text-lg sm:text-xl font-black text-indigo-700" id="kpiUsers">-- مستخدم</div>
+        <div class="mt-1 text-[11px] text-emerald-600 font-semibold" id="kpiPoolsSub">-- دفعة تشاركية</div>
+      </div>
+
+    </div>
+
+    <!-- ======================================================================= -->
+    <!-- 3. شريط التبويبات التشغيلية (Enterprise Tabs Navigation) -->
+    <!-- ======================================================================= -->
+    <div class="flex items-center gap-2 border-b border-slate-200 overflow-x-auto custom-scrollbar pb-1">
+      <button onclick="switchTab('orders')" id="tab-orders" class="tab-btn px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all border-b-2 border-emerald-600 text-emerald-700 bg-emerald-50/50 cursor-pointer flex items-center gap-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+        <span>الطلبات والشحنات الحية (Realtime)</span>
+        <span id="badgeOrdersCount" class="bg-emerald-600 text-white text-[11px] px-2 py-0.2 rounded-full font-mono">0</span>
+      </button>
+
+      <button onclick="switchTab('users')" id="tab-users" class="tab-btn px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all text-slate-600 hover:text-slate-900 hover:bg-slate-100 cursor-pointer flex items-center gap-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+        <span>إدارة المستخدمين والأدوار (Users & Roles)</span>
+      </button>
+
+      <button onclick="switchTab('stores')" id="tab-stores" class="tab-btn px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all text-slate-600 hover:text-slate-900 hover:bg-slate-100 cursor-pointer flex items-center gap-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
+        <span>المتاجر والمنتجات (Stores & Catalog)</span>
+      </button>
+
+      <button onclick="switchTab('couriers')" id="tab-couriers" class="tab-btn px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all text-slate-600 hover:text-slate-900 hover:bg-slate-100 cursor-pointer flex items-center gap-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path></svg>
+        <span>أسطول الكباتن وخريطة التواجد</span>
+      </button>
+
+      <button onclick="switchTab('pools')" id="tab-pools" class="tab-btn px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all text-slate-600 hover:text-slate-900 hover:bg-slate-100 cursor-pointer flex items-center gap-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+        <span>دفعات التجميع بالأحياء (Pools)</span>
+      </button>
+    </div>
+
+    <!-- ======================================================================= -->
+    <!-- 4. تبويب 1: مركز الشحنات الحية والتحكم الفوري (Orders Tab) -->
+    <!-- ======================================================================= -->
+    <div id="content-orders" class="space-y-4 tab-content">
+      
+      <!-- شريط البحث والفلترة السريعة -->
+      <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
+        
+        <!-- البحث بالنص -->
+        <div class="relative flex-1">
+          <input type="text" id="orderSearchInput" oninput="renderOrdersTable()" placeholder="ابحث برقم الطلب (#MSR)، اسم المتجر، حي التوصيل، العميل، أو الكابتن..." class="w-full pl-4 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all">
+          <svg class="w-5 h-5 text-slate-400 absolute right-3 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+        </div>
+
+        <!-- فلاتر الحالة وتصدير البيانات -->
+        <div class="flex items-center gap-1.5 overflow-x-auto custom-scrollbar pb-1">
+          <button onclick="setOrderFilter('all')" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-800 text-white cursor-pointer" data-filter="all">الكل</button>
+          <button onclick="setOrderFilter('pending')" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 cursor-pointer" data-filter="pending">بانتظار التجهيز</button>
+          <button onclick="setOrderFilter('preparing')" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 cursor-pointer" data-filter="preparing">قيد التحضير</button>
+          <button onclick="setOrderFilter('in_transit')" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 cursor-pointer" data-filter="in_transit">قيد التوصيل</button>
+          <button onclick="setOrderFilter('delivered')" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 cursor-pointer" data-filter="delivered">تم التسليم</button>
+          <button onclick="setOrderFilter('cancelled')" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 cursor-pointer" data-filter="cancelled">ملغي</button>
+          
+          <!-- زر تصدير CSV -->
+          <button onclick="exportOrdersToCSV()" title="تصدير الشحنات لملف CSV" class="p-2 text-slate-600 hover:text-emerald-700 hover:bg-slate-100 border border-slate-200 rounded-xl transition-all cursor-pointer">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+          </button>
+        </div>
+
+      </div>
+
+      <!-- جدول الطلبات الحي (Live Orders Data Table) -->
+      <div class="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+        <div class="overflow-x-auto custom-scrollbar">
+          <table class="w-full text-right border-collapse">
+            <thead>
+              <tr class="bg-slate-50/80 text-slate-500 text-xs font-bold border-b border-slate-200 uppercase tracking-wider">
+                <th class="p-3.5">كود الطلب</th>
+                <th class="p-3.5">المتجر / الاستلام</th>
+                <th class="p-3.5">وجهة التسليم (المكلا)</th>
+                <th class="p-3.5">نوع الشحنة</th>
+                <th class="p-3.5">المبلغ</th>
+                <th class="p-3.5">رمز OTP</th>
+                <th class="p-3.5">حالة الطلب (تعديل فوري)</th>
+                <th class="p-3.5 text-center">إدارة وإسناد</th>
+              </tr>
+            </thead>
+            <tbody id="ordersTableBody" class="divide-y divide-slate-100 text-xs sm:text-sm">
+              <tr>
+                <td colspan="8" class="p-8 text-center text-slate-400">
+                  <div class="inline-block animate-spin w-6 h-6 border-2 border-emerald-600 border-t-transparent rounded-full mb-2"></div>
+                  <div>جاري استعلام أحدث الطلبات من Supabase...</div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ======================================================================= -->
+    <!-- 5. تبويب 2: إدارة المستخدمين وتعديل الأدوار (Users & Roles Tab) -->
+    <!-- ======================================================================= -->
+    <div id="content-users" class="space-y-4 tab-content hidden">
+      <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
+        <div>
+          <h3 class="text-base font-bold text-[#002360]">سجل المستخدمين والأدوار (Profiles Data Table)</h3>
+          <p class="text-xs text-slate-500">إدارة الأدوار (عميل، تاجر، كابتن، مدير) والتحكم المباشر في الصلاحيات والمحافظ</p>
+        </div>
+        <div class="flex items-center gap-3">
+          <input type="text" id="userSearchInput" oninput="renderUsersTable()" placeholder="ابحث بالاسم أو رقم الهاتف..." class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+          <span class="text-xs font-bold bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-xl border border-indigo-200 font-mono" id="usersCountBadge">
+            0 مستخدم
+          </span>
+        </div>
+      </div>
+
+      <!-- جدول المستخدمين الحي -->
+      <div class="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+        <div class="overflow-x-auto custom-scrollbar">
+          <table class="w-full text-right border-collapse">
+            <thead>
+              <tr class="bg-slate-50/80 text-slate-500 text-xs font-bold border-b border-slate-200 uppercase tracking-wider">
+                <th class="p-3.5">المستخدم</th>
+                <th class="p-3.5">رقم الهاتف</th>
+                <th class="p-3.5">الدور في النظام (Role)</th>
+                <th class="p-3.5">رصيد المحفظة</th>
+                <th class="p-3.5">تاريخ التسجيل</th>
+                <th class="p-3.5 text-center">الإجراءات والتحكم</th>
+              </tr>
+            </thead>
+            <tbody id="usersTableBody" class="divide-y divide-slate-100 text-xs sm:text-sm">
+              <tr>
+                <td colspan="6" class="p-8 text-center text-slate-400">
+                  <div class="inline-block animate-spin w-6 h-6 border-2 border-emerald-600 border-t-transparent rounded-full mb-2"></div>
+                  <div>جاري جلب سجلات المستخدمين من Supabase...</div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================================================================= -->
+    <!-- 6. تبويب 3: شبكة المتاجر وقوائم الأصناف (Stores & Catalog Tab) -->
+    <!-- ======================================================================= -->
+    <div id="content-stores" class="space-y-4 tab-content hidden">
+      <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
+        <div>
+          <h3 class="text-base font-bold text-[#002360]">جدول المتاجر والكتالوج المعتمد في المكلا</h3>
+          <p class="text-xs text-slate-500">التحكم في تفعيل أو إيقاف المتاجر ورسوم التوصيل التشاركي وتصفح الأصناف</p>
+        </div>
+        <div class="flex items-center gap-3">
+          <span class="text-xs font-bold bg-blue-50 text-blue-700 px-3 py-1.5 rounded-xl border border-blue-200 font-mono" id="storesCountBadge">
+            0 متجر
+          </span>
+        </div>
+      </div>
+
+      <!-- جدول المتاجر الحي -->
+      <div class="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+        <div class="overflow-x-auto custom-scrollbar">
+          <table class="w-full text-right border-collapse">
+            <thead>
+              <tr class="bg-slate-50/80 text-slate-500 text-xs font-bold border-b border-slate-200 uppercase tracking-wider">
+                <th class="p-3.5">المتجر</th>
+                <th class="p-3.5">التصنيف</th>
+                <th class="p-3.5">الموقع والعنوان</th>
+                <th class="p-3.5">التقييم</th>
+                <th class="p-3.5">رسوم التوصيل التشاركي</th>
+                <th class="p-3.5">حالة التفعيل (Live Toggle)</th>
+                <th class="p-3.5 text-center">الأصناف والأسعار</th>
+              </tr>
+            </thead>
+            <tbody id="storesTableBody" class="divide-y divide-slate-100 text-xs sm:text-sm">
+              <tr>
+                <td colspan="7" class="p-8 text-center text-slate-400">
+                  <div class="inline-block animate-spin w-6 h-6 border-2 border-emerald-600 border-t-transparent rounded-full mb-2"></div>
+                  <div>جاري جلب بيانات المتاجر...</div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================================================================= -->
+    <!-- 7. تبويب 4: أسطول الكباتن والمناديب (Couriers Tab) -->
+    <!-- ======================================================================= -->
+    <div id="content-couriers" class="space-y-4 tab-content hidden">
+      <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
+        <div>
+          <h3 class="text-base font-bold text-[#002360]">أسطول المناديب والكباتن في المكلا</h3>
+          <p class="text-xs text-slate-500">مراقبة الجاهزية الميدانية، تقييم الأداء، وتوزيع الشحنات</p>
+        </div>
+        <span class="text-xs font-bold bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-xl border border-emerald-200">
+          تتبع GPS نشط
+        </span>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4" id="couriersListContainer">
+        <!-- يتم ملؤها ديناميكياً -->
+      </div>
+    </div>
+
+    <!-- ======================================================================= -->
+    <!-- 8. تبويب 5: غرف التجميع التشاركي (Pools Tab) -->
+    <!-- ======================================================================= -->
+    <div id="content-pools" class="space-y-4 tab-content hidden">
+      <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
+        <div>
+          <h3 class="text-base font-bold text-[#002360]">غرف ودفعات التوصيل التشاركي (Shared Pools)</h3>
+          <p class="text-xs text-slate-500">دمج طلبات نفس الحي لخفض تكلفة التوصيل على العميل وزيادة دخل المندوب</p>
+        </div>
+        <span class="text-xs font-bold bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-xl border border-indigo-200">
+          الخوارزمية الذكية نشطة
+        </span>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4" id="poolsListContainer">
+        <!-- يتم ملؤها ديناميكياً -->
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ========================================================================= -->
+  <!-- 9. نافذة إدارة وتفاصيل الطلب (Order Dispatch Modal) -->
+  <!-- ========================================================================= -->
+  <div id="orderDetailModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 hidden">
+    <div class="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-slate-100 overflow-hidden transform transition-all">
+      <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
+            #
+          </div>
+          <div>
+            <h4 class="font-bold text-slate-900 text-base" id="modalOrderCode">--</h4>
+            <p class="text-xs text-slate-500" id="modalOrderTime">--</p>
+          </div>
+        </div>
+        <button onclick="closeOrderModal()" class="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-200 cursor-pointer">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+
+      <div class="p-5 space-y-4 text-xs sm:text-sm">
+        <div class="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-xl">
+          <div>
+            <span class="text-slate-400 text-xs block">المتجر / الاستلام:</span>
+            <span class="font-bold text-slate-800" id="modalStoreName">--</span>
+          </div>
+          <div>
+            <span class="text-slate-400 text-xs block">حي التسليم:</span>
+            <span class="font-bold text-slate-800" id="modalDeliveryAddress">--</span>
+          </div>
+          <div>
+            <span class="text-slate-400 text-xs block">المبلغ الإجمالي:</span>
+            <span class="font-bold text-emerald-700" id="modalTotalAmount">-- ر.ي</span>
+          </div>
+          <div>
+            <span class="text-slate-400 text-xs block">كود التحقق السري (OTP):</span>
+            <span class="font-mono font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded border border-rose-200" id="modalOtpCode">--</span>
+          </div>
+        </div>
+
+        <!-- إسناد لكابتن مباشر -->
+        <div class="bg-teal-50/50 p-3 rounded-xl border border-teal-100">
+          <label class="block text-xs font-bold text-teal-900 mb-1.5">إسناد الطلب لكابتن من أسطول مسار:</label>
+          <div class="flex gap-2">
+            <select id="modalCourierSelect" class="flex-1 bg-white border border-teal-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-500">
+              <option value="">-- اختر كابتن لتوجيه الشحنة له --</option>
+            </select>
+            <button onclick="assignCourierFromModal()" class="px-3 py-1.5 bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs rounded-lg transition-all cursor-pointer">
+              إسناد فوري
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <span class="text-slate-500 font-bold block mb-1.5">تحديث حالة الشحنة المباشرة في Supabase:</span>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2" id="modalStatusButtons">
+            <!-- يتم تعبئة أزرار الحالات عبر JS -->
+          </div>
+        </div>
+      </div>
+
+      <div class="p-4 bg-slate-50 border-t border-slate-100 flex justify-end">
+        <button onclick="closeOrderModal()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl font-bold text-xs cursor-pointer">
+          إغلاق
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- 10. نافذة تعديل دور المستخدم (Edit Role Modal) -->
+  <!-- ========================================================================= -->
+  <div id="userRoleModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 hidden">
+    <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-slate-100 overflow-hidden">
+      <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+        <h4 class="font-bold text-slate-900 text-base">تعديل دور وصلاحيات المستخدم</h4>
+        <button onclick="closeRoleModal()" class="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-200 cursor-pointer">
+          ✕
+        </button>
+      </div>
+      <div class="p-5 space-y-4">
+        <div>
+          <span class="text-xs text-slate-400 block">المستخدم:</span>
+          <span class="font-bold text-slate-800 text-sm" id="roleModalUserName">--</span>
+          <span class="text-xs text-slate-500 font-mono block mt-0.5" id="roleModalUserPhone">--</span>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1.5">اختر الدور الجديد في المنظومة:</label>
+          <select id="roleModalSelect" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm text-slate-800 font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500">
+            <option value="customer">عميل (Customer) — تصفح وطلب الشحنات</option>
+            <option value="courier">مندوب توصيل (Courier) — استلام وتوصيل الطلبات</option>
+            <option value="merchant">تاجر وشريك (Merchant) — إدارة المتجر والطلبات الواردة</option>
+            <option value="admin">مدير نظام (Admin) — وصول كامل لكافة العمليات</option>
+          </select>
+        </div>
+        <p class="text-[11px] text-slate-500 bg-amber-50 p-2.5 rounded-lg border border-amber-200">
+          ⚠️ سيتم تحديث جدول <code>profiles</code> في خادم Supabase فوراً وتطبيق الصلاحيات لحظياً.
+        </p>
+      </div>
+      <div class="p-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-2">
+        <button onclick="closeRoleModal()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl font-bold text-xs cursor-pointer">
+          إلغاء
+        </button>
+        <button onclick="saveUserRole()" class="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl font-bold text-xs cursor-pointer">
+          حفظ وتطبيق الدور
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- 11. نافذة عرض قائمة أصناف المتجر (Store Products Modal) -->
+  <!-- ========================================================================= -->
+  <div id="storeProductsModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 hidden">
+    <div class="bg-white w-full max-w-2xl rounded-2xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[85vh]">
+      <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+        <div>
+          <h4 class="font-bold text-slate-900 text-base" id="storeModalTitle">قائمة أصناف المتجر</h4>
+          <p class="text-xs text-slate-500" id="storeModalSubtitle">--</p>
+        </div>
+        <button onclick="closeStoreProductsModal()" class="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-200 cursor-pointer">
+          ✕
+        </button>
+      </div>
+      <div class="p-4 overflow-y-auto custom-scrollbar flex-1 space-y-2" id="storeProductsContainer">
+        <!-- الأصناف -->
+      </div>
+      <div class="p-3 bg-slate-50 border-t border-slate-100 flex justify-end">
+        <button onclick="closeStoreProductsModal()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl font-bold text-xs cursor-pointer">
+          إغلاق
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- صندوق الإشعارات السريعة (Toast) -->
+  <div id="toastContainer" class="fixed bottom-5 left-5 z-50 space-y-2 pointer-events-none"></div>
+
+  <!-- ========================================================================= -->
+  <!-- 12. برمجية الجافاسكريبت والتكامل الحي مع Supabase REST API & Realtime -->
+  <!-- ========================================================================= -->
+  <script>
+    const SUPABASE_URL = "https://lerhwxfkgvtepqtlbjtp.supabase.co";
+    const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxlcmh3eGZrZ3Z0ZXBxdGxianRwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEzNjg3ODMsImV4cCI6MjEwNjk0NDc4M30.Em8EArTIWRxKYmWR375Cwf-OH3XJfPI20mOx3r4ydVs";
+
+    const HEADERS = {
+      "apikey": SUPABASE_ANON,
+      "Authorization": "Bearer " + SUPABASE_ANON,
+      "Content-Type": "application/json",
+      "Prefer": "return=representation"
+    };
+
+    // عميل Supabase Realtime الرسمي
+    let supabaseClient = null;
+    let realtimeChannel = null;
+
+    // مخزن البيانات المحلي
+    let state = {
+      orders: [],
+      stores: [],
+      products: [],
+      couriers: [],
+      pools: [],
+      profiles: [],
+      activeFilter: 'all',
+      selectedOrder: null,
+      selectedProfileForRole: null
+    };
+
+    // عند تحميل الصفحة
+    window.addEventListener('DOMContentLoaded', () => {
+      initSupabaseRealtime();
+      fetchAllData();
+      setInterval(fetchAllData, 15000); // تحديث دوري ذكي لضمان استقرار المزامنة
+    });
+
+    // 1. تهيئة قنوات Supabase Realtime للطلبات الحية
+    function initSupabaseRealtime() {
+      try {
+        if (window.supabase && typeof window.supabase.createClient === 'function') {
+          supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+          
+          realtimeChannel = supabaseClient
+            .channel('masar-admin-realtime')
+            .on(
+              'postgres_changes',
+              { event: '*', schema: 'public', table: 'orders' },
+              (payload) => {
+                console.log('⚡ [Realtime Event] Orders change:', payload);
+                handleRealtimeOrderChange(payload);
+              }
+            )
+            .on(
+              'postgres_changes',
+              { event: '*', schema: 'public', table: 'profiles' },
+              (payload) => {
+                console.log('⚡ [Realtime Event] Profiles change:', payload);
+                handleRealtimeProfileChange(payload);
+              }
+            )
+            .subscribe((status) => {
+              const badge = document.getElementById('realtimeBadge');
+              if (status === 'SUBSCRIBED') {
+                console.log('✅ Realtime Subscribed successfully');
+                if (badge) {
+                  badge.className = "hidden md:flex items-center gap-2 px-3.5 py-1.5 bg-emerald-50 border border-emerald-200 rounded-full text-xs font-semibold text-emerald-800";
+                  badge.innerHTML = `<span class="w-2.5 h-2.5 rounded-full bg-emerald-500 live-dot"></span><span>بث Realtime لحظي متصل ⚡</span><span class="text-emerald-500 font-mono text-[11px]" id="latencyBadge">Live</span>`;
+                }
+              }
+            });
+        }
+      } catch (err) {
+        console.warn('Realtime init fallback to smart polling:', err);
+      }
+    }
+
+    // معالجة تدفق أحداث الطلبات Realtime
+    function handleRealtimeOrderChange(payload) {
+      playNotificationChime();
+
+      if (payload.eventType === 'INSERT') {
+        const newOrder = payload.new;
+        // التأكد من عدم التكرار
+        const exists = state.orders.some(o => o.id === newOrder.id);
+        if (!exists) {
+          state.orders.unshift(newOrder);
+          showToast(`📦 وصل طلب جديد الآن: ${newOrder.order_code || '#MSR-NEW'}`, 'success');
+          updateKpis();
+          renderOrdersTable(newOrder.id);
+        }
+      } else if (payload.eventType === 'UPDATE') {
+        const updated = payload.new;
+        const idx = state.orders.findIndex(o => o.id === updated.id);
+        if (idx !== -1) {
+          state.orders[idx] = updated;
+        } else {
+          state.orders.unshift(updated);
+        }
+        showToast(`🔄 تم تحديث الطلب: ${updated.order_code || '#MSR'} (${_getStatusLabel(updated.status)})`, 'info');
+        updateKpis();
+        renderOrdersTable(updated.id);
+      } else if (payload.eventType === 'DELETE') {
+        state.orders = state.orders.filter(o => o.id !== payload.old.id);
+        updateKpis();
+        renderOrdersTable();
+      }
+    }
+
+    // معالجة تدفق أحداث المستخدمين Realtime
+    function handleRealtimeProfileChange(payload) {
+      if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
+        const p = payload.new;
+        const idx = state.profiles.findIndex(x => x.id === p.id);
+        if (idx !== -1) {
+          state.profiles[idx] = p;
+        } else {
+          state.profiles.unshift(p);
+        }
+        renderUsersTable();
+      }
+    }
+
+    // نغمة تنبيه صوتية لطيفة عند وصول طلب جديد (Web Audio API بدون ملفات خارجية)
+    function playNotificationChime() {
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5
+        osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.12); // A5
+        gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.35);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.35);
+      } catch (e) {}
+    }
+
+    // 2. دالة جلب كافة البيانات بالتوازي من Supabase REST API
+    async function fetchAllData() {
+      const icon = document.getElementById('refreshIcon');
+      if (icon) icon.classList.add('rotate-180');
+
+      const start = performance.now();
+
+      try {
+        const [ordersRes, storesRes, productsRes, couriersRes, poolsRes, profilesRes] = await Promise.all([
+          fetch(`${SUPABASE_URL}/rest/v1/orders?select=*&order=created_at.desc`, { headers: HEADERS }).then(r => r.json()),
+          fetch(`${SUPABASE_URL}/rest/v1/stores?select=*&order=created_at.asc`, { headers: HEADERS }).then(r => r.json()),
+          fetch(`${SUPABASE_URL}/rest/v1/products?select=*`, { headers: HEADERS }).then(r => r.json()),
+          fetch(`${SUPABASE_URL}/rest/v1/courier_locations?select=*`, { headers: HEADERS }).then(r => r.json()),
+          fetch(`${SUPABASE_URL}/rest/v1/shared_pools?select=*`, { headers: HEADERS }).then(r => r.json()),
+          fetch(`${SUPABASE_URL}/rest/v1/profiles?select=*&order=created_at.desc`, { headers: HEADERS }).then(r => r.json())
+        ]);
+
+        const end = performance.now();
+        const latencyEl = document.getElementById('latencyBadge');
+        if (latencyEl) latencyEl.textContent = `${Math.round(end - start)}ms`;
+
+        state.orders = Array.isArray(ordersRes) ? ordersRes : [];
+        state.stores = Array.isArray(storesRes) ? storesRes : [];
+        state.products = Array.isArray(productsRes) ? productsRes : [];
+        state.couriers = Array.isArray(couriersRes) ? couriersRes : [];
+        state.pools = Array.isArray(poolsRes) ? poolsRes : [];
+        state.profiles = Array.isArray(profilesRes) ? profilesRes : [];
+
+        updateKpis();
+        renderOrdersTable();
+        renderUsersTable();
+        renderStoresTable();
+        renderCouriers();
+        renderPools();
+
+        document.getElementById('lastSyncTime').textContent = new Date().toLocaleTimeString('ar-YE');
+      } catch (err) {
+        console.error("Error fetching live data:", err);
+      } finally {
+        setTimeout(() => {
+          if (icon) icon.classList.remove('rotate-180');
+        }, 600);
+      }
+    }
+
+    // تحديث مؤشرات الأداء الحية (KPIs)
+    function updateKpis() {
+      const totalOrders = state.orders.length;
+      const deliveredCount = state.orders.filter(o => o.status === 'delivered').length;
+      const activeCount = totalOrders - deliveredCount;
+
+      const gmv = state.orders.reduce((sum, o) => sum + (parseFloat(o.total_amount || o.price || 0)), 0);
+      const commission = gmv * 0.10;
+
+      document.getElementById('kpiGmv').textContent = `${gmv.toLocaleString()} ر.ي`;
+      document.getElementById('kpiCommission').textContent = `${Math.round(commission).toLocaleString()} ر.ي`;
+      document.getElementById('kpiTotalOrders').textContent = `${totalOrders} شحنة`;
+      document.getElementById('kpiOrdersSub').textContent = `${activeCount} جاري • ${deliveredCount} مكتمل`;
+      
+      const couriersCount = state.profiles.filter(p => p.role === 'courier').length || state.couriers.length || 3;
+      document.getElementById('kpiCouriers').textContent = `${couriersCount} كابتن`;
+      
+      document.getElementById('kpiStores').textContent = `${state.stores.length} متاجر`;
+      document.getElementById('kpiProducts').textContent = `${state.products.length} صنف مسجل`;
+      document.getElementById('kpiUsers').textContent = `${state.profiles.length} مستخدم`;
+      document.getElementById('kpiPoolsSub').textContent = `${state.pools.length} دفعات تشاركية`;
+      
+      const badge = document.getElementById('badgeOrdersCount');
+      if (badge) badge.textContent = totalOrders;
+      
+      const uBadge = document.getElementById('usersCountBadge');
+      if (uBadge) uBadge.textContent = `${state.profiles.length} مستخدم`;
+
+      const sBadge = document.getElementById('storesCountBadge');
+      if (sBadge) sBadge.textContent = `${state.stores.length} متجر مسجل`;
+    }
+
+    // 3. جدول الطلبات الحي وعمليات الإدارة المباشرة (Live Orders Data Table)
+    function renderOrdersTable(highlightId = null) {
+      const tbody = document.getElementById('ordersTableBody');
+      const searchQuery = (document.getElementById('orderSearchInput')?.value || '').trim().toLowerCase();
+
+      let filtered = state.orders;
+
+      if (state.activeFilter !== 'all') {
+        filtered = filtered.filter(o => o.status === state.activeFilter);
+      }
+
+      if (searchQuery) {
+        filtered = filtered.filter(o => 
+          (o.order_code || '').toLowerCase().includes(searchQuery) ||
+          (o.delivery_address_name || '').toLowerCase().includes(searchQuery) ||
+          (o.pickup_address || '').toLowerCase().includes(searchQuery) ||
+          (o.status || '').toLowerCase().includes(searchQuery) ||
+          (o.payment_method || '').toLowerCase().includes(searchQuery)
+        );
+      }
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="8" class="p-8 text-center text-slate-400">
+              <svg class="w-10 h-10 mx-auto text-slate-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+              لا توجد شحنات مطابقة للمعايير المحددة
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(order => {
+        const storeName = order.pickup_address || (state.stores.find(s => s.id === order.store_id)?.name) || 'متجر المكلا';
+        const amount = parseFloat(order.total_amount || order.price || 0).toLocaleString();
+        const isHighlight = order.id === highlightId;
+
+        return `
+          <tr class="hover:bg-slate-50/80 transition-colors ${isHighlight ? 'new-row-flash' : ''}">
+            <!-- كود الطلب -->
+            <td class="p-3.5 font-mono font-bold text-[#002360]">
+              <div class="flex items-center gap-1.5">
+                <span>${order.order_code || '#MSR'}</span>
+                <button onclick="navigator.clipboard.writeText('${order.order_code}'); showToast('تم نسخ الكود!', 'info');" class="text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer" title="نسخ الكود">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                </button>
+              </div>
+              <span class="text-[10px] text-slate-400 block font-normal">
+                ${order.created_at ? new Date(order.created_at).toLocaleTimeString('ar-YE', { hour: '2-digit', minute: '2-digit' }) : ''}
+              </span>
+            </td>
+
+            <!-- المتجر -->
+            <td class="p-3.5">
+              <div class="font-semibold text-slate-800 text-xs">${storeName}</div>
+              <span class="text-[10px] text-slate-400">${order.delivery_type === 'shared' || order.is_pool ? 'تجميع تشاركي' : 'طلب مباشر'}</span>
+            </td>
+
+            <!-- وجهة التسليم -->
+            <td class="p-3.5 text-slate-600 text-xs">${order.delivery_address_name || order.dropoff_address || 'المكلا'}</td>
+
+            <!-- نوع الشحنة والدفع -->
+            <td class="p-3.5">
+              <span class="px-2 py-0.5 rounded text-[11px] font-bold ${order.is_pool || order.delivery_type === 'shared' ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-slate-100 text-slate-700'}">
+                ${order.is_pool || order.delivery_type === 'shared' ? 'توصيل تشاركي' : 'خاص مباشر'}
+              </span>
+              <div class="mt-1 text-[10px] text-slate-500 font-medium">${_getPaymentBadge(order.payment_method)}</div>
+            </td>
+
+            <!-- المبلغ -->
+            <td class="p-3.5 font-bold text-emerald-700 font-mono text-xs">${amount} ر.ي</td>
+
+            <!-- رمز OTP -->
+            <td class="p-3.5">
+              <span class="font-mono bg-slate-100 px-2 py-0.5 rounded text-xs font-bold text-slate-700">${order.otp_code || '****'}</span>
+            </td>
+
+            <!-- قائمة تعديل الحالة المباشرة (UPDATE CRUD في Supabase) -->
+            <td class="p-3.5">
+              <select onchange="updateOrderStatusDirect('${order.id}', this.value)" class="text-xs font-bold px-2 py-1 rounded-lg border focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer ${_getStatusClass(order.status)}">
+                <option value="pending" ${order.status === 'pending' ? 'selected' : ''}>⏳ بانتظار التجهيز</option>
+                <option value="preparing" ${order.status === 'preparing' ? 'selected' : ''}>🍳 قيد التحضير</option>
+                <option value="in_transit" ${order.status === 'in_transit' || order.status === 'picked_up' ? 'selected' : ''}>🛵 قيد التوصيل</option>
+                <option value="delivered" ${order.status === 'delivered' ? 'selected' : ''}>✅ تم التسليم</option>
+                <option value="cancelled" ${order.status === 'cancelled' ? 'selected' : ''}>❌ إلغاء الطلب</option>
+              </select>
+            </td>
+
+            <!-- أزرار الإجراءات المباشرة -->
+            <td class="p-3.5 text-center">
+              <div class="flex items-center justify-center gap-1.5">
+                <button onclick="openAssignCourierModal('${order.id}')" title="إسناد الطلب لكابتن" class="px-2.5 py-1 bg-teal-50 hover:bg-teal-700 hover:text-white text-teal-800 rounded-lg text-xs font-bold border border-teal-200 transition-all cursor-pointer">
+                  🛵 إسناد
+                </button>
+                <button onclick="openOrderModal('${order.id}')" title="تفاصيل كاملة" class="px-2.5 py-1 bg-slate-100 hover:bg-[#002360] hover:text-white text-slate-700 rounded-lg text-xs font-bold transition-all cursor-pointer">
+                  تفاصيل
+                </button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // 4. جدول المستخدمين وتعديل الأدوار (Users & Roles Data Table)
+    function renderUsersTable() {
+      const tbody = document.getElementById('usersTableBody');
+      if (!tbody) return;
+
+      const q = (document.getElementById('userSearchInput')?.value || '').trim().toLowerCase();
+      let users = state.profiles;
+
+      if (q) {
+        users = users.filter(u => 
+          (u.full_name || '').toLowerCase().includes(q) ||
+          (u.phone || '').toLowerCase().includes(q) ||
+          (u.role || '').toLowerCase().includes(q)
+        );
+      }
+
+      if (users.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="6" class="p-8 text-center text-slate-400">
+              لا توجد سجلات مستخدمين مطابقة
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = users.map(user => {
+        const roleLabel = _getRoleLabel(user.role);
+        const roleBadgeClass = _getRoleBadgeClass(user.role);
+        const wallet = (parseFloat(user.wallet_balance || 0)).toLocaleString();
+        const dateStr = user.created_at ? new Date(user.created_at).toLocaleDateString('ar-YE') : '--';
+
+        return `
+          <tr class="hover:bg-slate-50/80 transition-colors">
+            <!-- المستخدم -->
+            <td class="p-3.5 flex items-center gap-2.5">
+              <div class="w-8 h-8 rounded-full bg-slate-200 text-slate-700 font-bold flex items-center justify-center text-xs">
+                ${(user.full_name || 'م')[0]}
+              </div>
+              <div>
+                <div class="font-bold text-slate-900 text-xs">${user.full_name || 'مستخدم مسار'}</div>
+                <div class="text-[10px] text-slate-400 font-mono">${user.id.slice(0, 8)}...</div>
+              </div>
+            </td>
+
+            <!-- رقم الهاتف -->
+            <td class="p-3.5 font-mono text-xs text-slate-700">${user.phone || '--'}</td>
+
+            <!-- الدور الحالي (مع تعديل مباشر في Supabase) -->
+            <td class="p-3.5">
+              <select onchange="updateUserRoleDirect('${user.id}', this.value, '${user.full_name || 'المستخدم'}')" class="text-xs font-bold px-2.5 py-1 rounded-lg border focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer ${roleBadgeClass}">
+                <option value="customer" ${user.role === 'customer' ? 'selected' : ''}>👤 عميل (Customer)</option>
+                <option value="merchant" ${user.role === 'merchant' ? 'selected' : ''}>🏬 تاجر (Merchant)</option>
+                <option value="courier" ${user.role === 'courier' ? 'selected' : ''}>🛵 مندوب (Courier)</option>
+                <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>👑 مدير نظام (Admin)</option>
+              </select>
+            </td>
+
+            <!-- رصيد المحفظة -->
+            <td class="p-3.5 font-bold font-mono text-emerald-700 text-xs">${wallet} ر.ي</td>
+
+            <!-- تاريخ التسجيل -->
+            <td class="p-3.5 text-xs text-slate-500">${dateStr}</td>
+
+            <!-- الإجراءات -->
+            <td class="p-3.5 text-center">
+              <button onclick="openRoleModal('${user.id}')" class="px-3 py-1 bg-indigo-50 hover:bg-indigo-700 hover:text-white text-indigo-700 rounded-lg text-xs font-bold border border-indigo-200 transition-all cursor-pointer">
+                تعديل الصلاحيات
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // 5. جدول المتاجر الحي وإمكانية تفعيل/إيقاف المتجر (Stores Data Table)
+    function renderStoresTable() {
+      const tbody = document.getElementById('storesTableBody');
+      if (!tbody) return;
+
+      if (state.stores.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-slate-400">لا توجد متاجر مسجلة</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = state.stores.map(store => {
+        const prodsCount = state.products.filter(p => p.store_id === store.id).length;
+        const isActive = store.is_active !== false;
+
+        return `
+          <tr class="hover:bg-slate-50/80 transition-colors">
+            <!-- المتجر -->
+            <td class="p-3.5">
+              <div class="flex items-center gap-3">
+                <img src="${store.image_url || 'https://images.unsplash.com/photo-1544025162-d76694265947?w=100'}" class="w-10 h-10 rounded-xl object-cover border border-slate-200 shadow-2xs" alt="${store.name}">
+                <div>
+                  <div class="font-bold text-slate-900 text-xs sm:text-sm">${store.name}</div>
+                  <div class="text-[10px] text-slate-400 font-mono">${store.id.slice(0, 8)}...</div>
+                </div>
+              </div>
+            </td>
+
+            <!-- التصنيف -->
+            <td class="p-3.5 text-xs text-slate-600">${_getCategoryLabel(store.category)}</td>
+
+            <!-- الموقع والعنوان -->
+            <td class="p-3.5 text-xs text-slate-600">${store.address_text || store.district || 'المكلا'}</td>
+
+            <!-- التقييم -->
+            <td class="p-3.5 text-xs">
+              <span class="text-amber-500 font-bold">★ ${store.rating || '4.8'}</span>
+              <span class="text-slate-400 text-[10px]">(${store.reviews_count || 120})</span>
+            </td>
+
+            <!-- رسوم التوصيل التشاركي -->
+            <td class="p-3.5 text-xs font-mono font-bold text-emerald-700">${store.shared_delivery_fee || 500} ر.ي</td>
+
+            <!-- مفتاح التفعيل اللحظي (UPDATE is_active في Supabase) -->
+            <td class="p-3.5">
+              <button onclick="toggleStoreStatusDirect('${store.id}', ${isActive}, '${store.name}')" class="px-3 py-1 rounded-full text-xs font-bold border transition-all cursor-pointer ${isActive ? 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100' : 'bg-rose-50 text-rose-700 border-rose-300 hover:bg-rose-100'}">
+                ${isActive ? '🟢 نشط ومتاح' : '🔴 معطل ومغلق'}
+              </button>
+            </td>
+
+            <!-- عرض الأصناف -->
+            <td class="p-3.5 text-center">
+              <button onclick="openStoreProductsModal('${store.id}')" class="px-3 py-1 bg-blue-50 hover:bg-blue-700 hover:text-white text-blue-700 rounded-lg text-xs font-bold border border-blue-200 transition-all cursor-pointer">
+                الأصناف (${prodsCount})
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // 6. عرض المناديب
+    function renderCouriers() {
+      const container = document.getElementById('couriersListContainer');
+      if (!container) return;
+
+      // دمج الكباتن من جدول profiles و courier_locations
+      const courierProfiles = state.profiles.filter(p => p.role === 'courier');
+      const list = courierProfiles.length > 0 ? courierProfiles : [
+        { id: 'c1', full_name: 'الكابتن أحمد باوزير', phone: '+967770000002', area: 'حي الشرج • شارع الميناء', rating: '4.9', completed: '142 شحنة' },
+        { id: 'c2', full_name: 'الكابتن عمر باجعفر', phone: '+967770000003', area: 'حي فوّه • المساكن', rating: '4.8', completed: '98 شحنة' },
+        { id: 'c3', full_name: 'الكابتن صالح العمودي', phone: '+967770000004', area: 'ديس المكلا • الغليلة', rating: '4.9', completed: '210 شحنة' }
+      ];
+
+      container.innerHTML = list.map(c => `
+        <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex items-center gap-3.5">
+          <div class="w-12 h-12 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center font-bold text-lg border border-teal-200">
+            🛵
+          </div>
+          <div class="flex-1">
+            <div class="flex items-center justify-between">
+              <h4 class="font-bold text-slate-900 text-sm">${c.full_name || 'كابتن مسار'}</h4>
+              <span class="w-2 h-2 rounded-full bg-emerald-500 live-dot"></span>
+            </div>
+            <p class="text-xs text-slate-500 mt-0.5">${c.area || c.phone || 'المكلا وضواحيها'}</p>
+            <div class="flex items-center gap-3 mt-1.5 text-xs text-slate-600">
+              <span class="text-amber-500 font-bold">★ ${c.rating || '4.9'}</span>
+              <span>• ${c.completed || 'نشط'}</span>
+              <span class="text-teal-700 font-bold">متصل 4G</span>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // 7. عرض غرف التجميع التشاركي
+    function renderPools() {
+      const container = document.getElementById('poolsListContainer');
+      if (!container) return;
+
+      container.innerHTML = state.pools.map(pool => `
+        <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between">
+              <span class="font-mono text-xs font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
+                ${pool.pool_code || 'POOL-01'}
+              </span>
+              <span class="text-xs font-bold text-emerald-600">وفر ${pool.discount_percent || 58}%</span>
+            </div>
+            <h4 class="font-bold text-slate-900 text-sm mt-2">${pool.title}</h4>
+            <p class="text-xs text-slate-500 mt-0.5">${pool.neighborhood || 'حي فوه'} • ${pool.window_time_text || '12:30 م - 02:00 م'}</p>
+          </div>
+
+          <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+            <div class="text-slate-600">
+              الطلبات الحالية: <b class="text-slate-900 font-bold">${pool.current_orders_count || 1} / ${pool.max_orders_count || 6}</b>
+            </div>
+            <div class="font-bold text-emerald-700 font-mono text-sm">
+              ${parseFloat(pool.shared_price || 500).toLocaleString()} ر.ي
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // =========================================================================
+    // عمليات الإدارة المباشرة (CRUD Operations directly via Supabase REST API)
+    // =========================================================================
+
+    // أ. تحديث حالة الطلب المباشر
+    async function updateOrderStatusDirect(orderId, newStatus) {
+      try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/orders?id=eq.${orderId}`, {
+          method: 'PATCH',
+          headers: HEADERS,
+          body: JSON.stringify({
+            status: newStatus,
+            updated_at: new Date().toISOString()
+          })
+        });
+
+        if (res.ok) {
+          const ord = state.orders.find(o => o.id === orderId);
+          if (ord) ord.status = newStatus;
+          showToast(`تم تحديث حالة الطلب إلى (${_getStatusLabel(newStatus)}) في Supabase!`, 'success');
+          updateKpis();
+          renderOrdersTable(orderId);
+        } else {
+          showToast('فشل تحديث الحالة في Supabase', 'error');
+        }
+      } catch (e) {
+        showToast('تعذر الاتصال بقاعدة البيانات', 'error');
+      }
+    }
+
+    // ب. إسناد الطلب لكابتن وتغيير حالته لقيد التوصيل
+    function openAssignCourierModal(orderId) {
+      const order = state.orders.find(o => o.id === orderId);
+      if (!order) return;
+      openOrderModal(orderId);
+    }
+
+    async function assignCourierFromModal() {
+      if (!state.selectedOrder) return;
+      const courierSelect = document.getElementById('modalCourierSelect');
+      const courierId = courierSelect.value;
+      const courierName = courierSelect.options[courierSelect.selectedIndex]?.text || 'الكابتن';
+
+      if (!courierId) {
+        showToast('يرجى اختيار كابتن لإسناد الشحنة إليه', 'warning');
+        return;
+      }
+
+      try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/orders?id=eq.${state.selectedOrder.id}`, {
+          method: 'PATCH',
+          headers: HEADERS,
+          body: JSON.stringify({
+            courier_id: courierId,
+            status: 'in_transit',
+            updated_at: new Date().toISOString()
+          })
+        });
+
+        if (res.ok) {
+          state.selectedOrder.courier_id = courierId;
+          state.selectedOrder.status = 'in_transit';
+          showToast(`تم إسناد الطلب إلى ${courierName} بنجاح!`, 'success');
+          closeOrderModal();
+          fetchAllData();
+        } else {
+          showToast('تعذر إسناد الطلب في Supabase', 'error');
+        }
+      } catch (e) {
+        showToast('فشل الاتصال بالسيرفر', 'error');
+      }
+    }
+
+    // ج. تعديل دور المستخدم (Role CRUD)
+    async function updateUserRoleDirect(userId, newRole, userName) {
+      try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}`, {
+          method: 'PATCH',
+          headers: HEADERS,
+          body: JSON.stringify({
+            role: newRole,
+            updated_at: new Date().toISOString()
+          })
+        });
+
+        if (res.ok) {
+          const u = state.profiles.find(p => p.id === userId);
+          if (u) u.role = newRole;
+          showToast(`تم تغيير دور (${userName}) بنجاح إلى ${_getRoleLabel(newRole)}!`, 'success');
+          renderUsersTable();
+        } else {
+          showToast('فشل تعديل الدور في قاعدة البيانات', 'error');
+        }
+      } catch (e) {
+        showToast('فشل الاتصال بالسيرفر', 'error');
+      }
+    }
+
+    // د. تفعيل / إيقاف المتجر المباشر
+    async function toggleStoreStatusDirect(storeId, currentStatus, storeName) {
+      const nextStatus = !currentStatus;
+      try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/stores?id=eq.${storeId}`, {
+          method: 'PATCH',
+          headers: HEADERS,
+          body: JSON.stringify({
+            is_active: nextStatus,
+            updated_at: new Date().toISOString()
+          })
+        });
+
+        if (res.ok) {
+          const store = state.stores.find(s => s.id === storeId);
+          if (store) store.is_active = nextStatus;
+          showToast(`تم ${nextStatus ? 'تفعيل وإتاحة' : 'إيقاف وتعطيل'} متجر (${storeName}) بنجاح!`, 'success');
+          renderStoresTable();
+        } else {
+          showToast('فشل تحديث حالة المتجر في Supabase', 'error');
+        }
+      } catch (e) {
+        showToast('فشل الاتصال بالخادم', 'error');
+      }
+    }
+
+    // هـ. نافذة تفاصيل الطلب
+    function openOrderModal(orderId) {
+      const order = state.orders.find(o => o.id === orderId);
+      if (!order) return;
+
+      state.selectedOrder = order;
+
+      document.getElementById('modalOrderCode').textContent = order.order_code || '#MSR';
+      document.getElementById('modalOrderTime').textContent = order.created_at ? new Date(order.created_at).toLocaleString('ar-YE') : '';
+      document.getElementById('modalStoreName').textContent = order.pickup_address || 'متجر معتمد';
+      document.getElementById('modalDeliveryAddress').textContent = order.delivery_address_name || order.dropoff_address || 'المكلا';
+      document.getElementById('modalTotalAmount').textContent = `${parseFloat(order.total_amount || order.price || 0).toLocaleString()} ر.ي`;
+      document.getElementById('modalOtpCode').textContent = order.otp_code || '1234';
+
+      // تعبئة قائمة الكباتن في النافذة
+      const courierSelect = document.getElementById('modalCourierSelect');
+      const couriersList = state.profiles.filter(p => p.role === 'courier');
+      const fallbackCouriers = [
+        { id: '11111111-2222-3333-4444-555555555555', full_name: 'الكابتن أحمد باوزير' },
+        { id: '22222222-3333-4444-5555-666666666666', full_name: 'الكابتن عمر باجعفر' },
+        { id: '33333333-4444-5555-6666-777777777777', full_name: 'الكابتن صالح العمودي' }
+      ];
+      const activeCouriers = couriersList.length > 0 ? couriersList : fallbackCouriers;
+
+      courierSelect.innerHTML = `<option value="">-- اختر كابتن لتوجيه الشحنة له --</option>` +
+        activeCouriers.map(c => `
+          <option value="${c.id}" ${order.courier_id === c.id ? 'selected' : ''}>
+            ${c.full_name || 'كابتن مسار'} (${c.phone || 'متصل'})
+          </option>
+        `).join('');
+
+      const buttonsContainer = document.getElementById('modalStatusButtons');
+      buttonsContainer.innerHTML = `
+        <button onclick="updateOrderStatusDirect('${order.id}', 'pending'); closeOrderModal();" class="p-2 rounded-xl text-xs font-bold border transition-all ${order.status === 'pending' ? 'bg-amber-600 text-white border-amber-600' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'}">
+          ⏳ بانتظار التجهيز
+        </button>
+        <button onclick="updateOrderStatusDirect('${order.id}', 'preparing'); closeOrderModal();" class="p-2 rounded-xl text-xs font-bold border transition-all ${order.status === 'preparing' ? 'bg-orange-600 text-white border-orange-600' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'}">
+          🍳 قيد التحضير
+        </button>
+        <button onclick="updateOrderStatusDirect('${order.id}', 'in_transit'); closeOrderModal();" class="p-2 rounded-xl text-xs font-bold border transition-all ${order.status === 'in_transit' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'}">
+          🛵 قيد التوصيل
+        </button>
+        <button onclick="updateOrderStatusDirect('${order.id}', 'delivered'); closeOrderModal();" class="p-2 rounded-xl text-xs font-bold border transition-all ${order.status === 'delivered' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'}">
+          ✅ تم التسليم
+        </button>
+      `;
+
+      document.getElementById('orderDetailModal').classList.remove('hidden');
+    }
+
+    function closeOrderModal() {
+      document.getElementById('orderDetailModal').classList.add('hidden');
+      state.selectedOrder = null;
+    }
+
+    // و. نافذة تعديل دور المستخدم
+    function openRoleModal(userId) {
+      const u = state.profiles.find(p => p.id === userId);
+      if (!u) return;
+
+      state.selectedProfileForRole = u;
+      document.getElementById('roleModalUserName').textContent = u.full_name || 'مستخدم مسار';
+      document.getElementById('roleModalUserPhone').textContent = u.phone || '--';
+      document.getElementById('roleModalSelect').value = u.role || 'customer';
+      document.getElementById('userRoleModal').classList.remove('hidden');
+    }
+
+    function closeRoleModal() {
+      document.getElementById('userRoleModal').classList.add('hidden');
+      state.selectedProfileForRole = null;
+    }
+
+    async function saveUserRole() {
+      if (!state.selectedProfileForRole) return;
+      const newRole = document.getElementById('roleModalSelect').value;
+      await updateUserRoleDirect(state.selectedProfileForRole.id, newRole, state.selectedProfileForRole.full_name);
+      closeRoleModal();
+    }
+
+    // ز. نافذة عرض أصناف المتجر
+    function openStoreProductsModal(storeId) {
+      const store = state.stores.find(s => s.id === storeId);
+      if (!store) return;
+
+      document.getElementById('storeModalTitle').textContent = `قائمة أصناف (${store.name})`;
+      document.getElementById('storeModalSubtitle').textContent = `${store.district || 'المكلا'} • رسوم التوصيل: ${store.shared_delivery_fee || 500} ر.ي`;
+
+      const prods = state.products.filter(p => p.store_id === storeId);
+      const container = document.getElementById('storeProductsContainer');
+
+      if (prods.length === 0) {
+        container.innerHTML = `
+          <div class="p-8 text-center text-slate-400">
+            <svg class="w-10 h-10 mx-auto text-slate-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
+            لا توجد أصناف مدخلة لهذا المتجر بعد في Supabase
+          </div>
+        `;
+      } else {
+        container.innerHTML = prods.map(p => `
+          <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <img src="${p.image_url || (Array.isArray(p.images) && p.images[0]) || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100'}" class="w-12 h-12 rounded-lg object-cover border border-slate-200" alt="${p.name}">
+              <div>
+                <h5 class="font-bold text-slate-900 text-xs sm:text-sm">${p.name}</h5>
+                <p class="text-[11px] text-slate-500 line-clamp-1">${p.description || 'صنف مسجل'}</p>
+              </div>
+            </div>
+            <div class="text-right">
+              <div class="font-bold text-emerald-700 font-mono text-sm">${parseFloat(p.price || 0).toLocaleString()} ر.ي</div>
+              <span class="text-[10px] text-slate-400">${p.is_best_seller ? '⭐ الأكثر طلباً' : 'متوفر'}</span>
+            </div>
+          </div>
+        `).join('');
+      }
+
+      document.getElementById('storeProductsModal').classList.remove('hidden');
+    }
+
+    function closeStoreProductsModal() {
+      document.getElementById('storeProductsModal').classList.add('hidden');
+    }
+
+    // إرسال طلب تجريبي فوري لـ Supabase للتحقق المباشر
+    async function insertLiveTestOrder() {
+      const btn = document.getElementById('btnTestOrder');
+      btn.disabled = true;
+      btn.innerHTML = `<span class="inline-block animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></span> جاري الإرسال...`;
+
+      const randNum = Math.floor(Math.random() * 900000) + 100000;
+      const testCode = `#MSR-RT${randNum}`;
+      const testOtp = Math.floor(Math.random() * 9000 + 1000).toString();
+
+      const payload = {
+        order_code: testCode,
+        customer_id: state.profiles[0]?.id || "11111111-1111-1111-1111-111111111111",
+        store_id: state.stores[0]?.id || "11111111-1111-1111-1111-111111111111",
+        status: "pending",
+        delivery_type: "solo",
+        total_amount: 3500.00,
+        price: 3500.00,
+        delivery_fee: 500.00,
+        otp_code: testOtp,
+        qr_code_encrypted: `MSR#${testCode}#${testOtp}`,
+        qr_payload: `MSR#${testCode}#${testOtp}`,
+        pickup_address: "مطاعم وبروست العمودي - المساكن",
+        dropoff_address: "المكلا - الديس - الشارع العام",
+        delivery_address_name: "المكلا - الديس - الشارع العام",
+        is_pool: false,
+        payment_method: "cash_on_delivery",
+        shipment_details: { type: "admin_live_test", timestamp: new Date().toISOString() }
+      };
+
+      try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/orders`, {
+          method: 'POST',
+          headers: HEADERS,
+          body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+          showToast(`تم إدراج طلب حي برقم ${testCode}! سيصل إشعار Realtime فوراً.`, 'success');
+        } else {
+          const err = await res.text();
+          showToast(`خطأ في الإدراج: ${err}`, 'error');
+        }
+      } catch (e) {
+        showToast(`فشل الاتصال: ${e.message}`, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+          <span class="hidden sm:inline">+ طلب تجريبي جديد</span>
+          <span class="sm:hidden">+ طلب</span>
+        `;
+      }
+    }
+
+    // فلترة حالات الطلبات
+    function setOrderFilter(filter) {
+      state.activeFilter = filter;
+      document.querySelectorAll('.filter-btn').forEach(btn => {
+        if (btn.getAttribute('data-filter') === filter) {
+          btn.className = "filter-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-800 text-white cursor-pointer";
+        } else {
+          btn.className = "filter-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 cursor-pointer";
+        }
+      });
+      renderOrdersTable();
+    }
+
+    // تبديل التبويبات
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('border-b-2', 'border-emerald-600', 'text-emerald-700', 'bg-emerald-50/50');
+        btn.classList.add('text-slate-600', 'hover:text-slate-900', 'hover:bg-slate-100');
+      });
+
+      const activeContent = document.getElementById(`content-${tabId}`);
+      const activeTabBtn = document.getElementById(`tab-${tabId}`);
+
+      if (activeContent) activeContent.classList.remove('hidden');
+      if (activeTabBtn) {
+        activeTabBtn.classList.remove('text-slate-600', 'hover:text-slate-900', 'hover:bg-slate-100');
+        activeTabBtn.classList.add('border-b-2', 'border-emerald-600', 'text-emerald-700', 'bg-emerald-50/50');
+      }
+    }
+
+    // تصدير الشحنات لملف CSV
+    function exportOrdersToCSV() {
+      if (state.orders.length === 0) {
+        showToast("لا توجد بيانات شحنات لتصديرها", "warning");
+        return;
+      }
+
+      let csv = "\uFEFFكود الطلب,المتجر,العنوان,الحالة,المبلغ,طريقة الدفع,OTP,تاريخ الإنشاء\n";
+      state.orders.forEach(o => {
+        csv += `"${o.order_code}","${o.pickup_address || ''}","${o.delivery_address_name || ''}","${o.status}","${o.total_amount || o.price}","${o.payment_method || 'cash'}","${o.otp_code}","${o.created_at}"\n`;
+      });
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = `masar_live_orders_${new Date().toISOString().slice(0, 10)}.csv`;
+      link.click();
+      showToast("تم تنزيل ملف CSV بنجاح!", "success");
+    }
+
+    // دوال مساعدة للتنسيق والبادجات
+    function _getStatusLabel(status) {
+      const s = (status || '').toLowerCase();
+      if (s === 'pending') return 'بانتظار التجهيز';
+      if (s === 'preparing') return 'قيد التحضير';
+      if (s === 'in_transit' || s === 'picked_up') return 'قيد التوصيل';
+      if (s === 'delivered') return 'تم التسليم';
+      if (s === 'cancelled') return 'ملغي';
+      return status || '--';
+    }
+
+    function _getStatusClass(status) {
+      const s = (status || '').toLowerCase();
+      if (s === 'delivered') return 'bg-emerald-50 text-emerald-700 border-emerald-300';
+      if (s === 'in_transit' || s === 'picked_up') return 'bg-blue-50 text-blue-700 border-blue-300';
+      if (s === 'preparing') return 'bg-orange-50 text-orange-700 border-orange-300';
+      if (s === 'cancelled') return 'bg-rose-50 text-rose-700 border-rose-300';
+      return 'bg-amber-50 text-amber-700 border-amber-300';
+    }
+
+    function _getRoleLabel(role) {
+      const r = (role || '').toLowerCase();
+      if (r === 'admin') return 'مدير نظام';
+      if (r === 'courier') return 'مندوب توصيل';
+      if (r === 'merchant') return 'تاجر وشريك';
+      return 'عميل';
+    }
+
+    function _getRoleBadgeClass(role) {
+      const r = (role || '').toLowerCase();
+      if (r === 'admin') return 'bg-rose-50 text-rose-700 border-rose-200';
+      if (r === 'courier') return 'bg-teal-50 text-teal-700 border-teal-200';
+      if (r === 'merchant') return 'bg-blue-50 text-blue-700 border-blue-200';
+      return 'bg-slate-100 text-slate-700 border-slate-200';
+    }
+
+    function _getCategoryLabel(cat) {
+      const c = (cat || '').toLowerCase();
+      if (c.contains('pharm') || c.contains('صيدل')) return 'صيدليات ومستلزمات';
+      if (c.contains('super') || c.contains('تموين')) return 'سوبرماركت ومواد غذائية';
+      if (c.contains('market') || c.contains('خضار') || c.contains('طازج')) return 'أسواق مركزية وطازجة';
+      return 'مطاعم ووجبات';
+    }
+
+    function _getPaymentBadge(method) {
+      const m = (method || '').toLowerCase();
+      if (m.includes('kuraimi')) return 'محفظة الكريمي';
+      if (m.includes('floosak')) return 'محفظة فلوسك';
+      if (m.includes('jawali')) return 'محفظة جوالي';
+      return 'دفع نقدي (COD)';
+    }
+
+    // إظهار تنبيه Toast
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      
+      const colors = {
+        success: 'bg-emerald-800 text-white border-emerald-700',
+        error: 'bg-rose-800 text-white border-rose-700',
+        warning: 'bg-amber-800 text-white border-amber-700',
+        info: 'bg-slate-800 text-white border-slate-700'
+      };
+
+      toast.className = `px-4 py-2.5 rounded-xl text-xs font-bold shadow-xl border flex items-center gap-2 pointer-events-auto transform transition-all duration-300 translate-y-2 opacity-0 ${colors[type] || colors.info}`;
+      toast.innerHTML = `
+        <span>${type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ'}</span>
+        <span>${message}</span>
+      `;
+
+      container.appendChild(toast);
+      requestAnimationFrame(() => {
+        toast.classList.remove('translate-y-2', 'opacity-0');
+      });
+
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => toast.remove(), 300);
+      }, 3500);
+    }
+
+    // تبديل الوضع الداكن
+    function toggleDarkMode() {
+      document.body.classList.toggle('dark');
+      if (document.body.classList.contains('dark')) {
+        document.body.classList.replace('bg-[#F8FAFC]', 'bg-slate-900');
+        showToast("تم تفعيل الوضع الليلي", "info");
+      } else {
+        document.body.classList.replace('bg-slate-900', 'bg-[#F8FAFC]');
+        showToast("تم تفعيل الوضع النهاري", "info");
+      }
+    }
+  </script>
+
+</body>
+</html>
